@@ -38,7 +38,7 @@ PyMySQL==1.1.1    # Updated for CVE-2024-36039
 python-jose==3.4.0  # Updated for CVE-2024-33663
 python-multipart==0.0.18  # Updated for CVE-2024-53981
 SQLAlchemy==2.0.29
-starlette==0.40.0  # Updated for CVE-2024-47874
+starlette==0.36.3  # Updated for CVE-2024-47874
 
 # Security
 pyjwt==2.10.1
