@@ -85,23 +85,25 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           
-      - name: Build for scanning
-        id: build-scan
+      - name: Build and scan image
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: false
-          tags: ${{ env.DOCKER_IMAGE }}:scan-temp-${{ github.sha }}
-          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+            ${{ env.DOCKER_IMAGE }}:latest
+          platforms: linux/amd64,linux/arm64
           cache-from: type=registry,ref=${{ env.DOCKER_IMAGE }}:cache
           cache-to: type=inline,mode=max
           build-args: |
             PYTHON_VERSION=3.10.12
           
-      - name: Scan with Trivy
+      - name: Scan with Trivy (using Docker Hub)
+        if: github.event_name != 'pull_request'
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.DOCKER_IMAGE }}:scan-temp-${{ github.sha }}
+          image-ref: ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
           format: sarif
           output: trivy-results.sarif
           exit-code: '1'
@@ -110,21 +112,7 @@ jobs:
           vuln-type: os,library
           
       - name: Upload scan results
+        if: github.event_name != 'pull_request'
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
-          
-      - name: Build and push final image
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
-            ${{ env.DOCKER_IMAGE }}:latest
-          platforms: linux/amd64,linux/arm64
-          cache-from: |
-            type=registry,ref=${{ env.DOCKER_IMAGE }}:cache
-            type=registry,ref=${{ env.DOCKER_IMAGE }}:scan-temp-${{ github.sha }}
-          cache-to: type=inline,mode=max
