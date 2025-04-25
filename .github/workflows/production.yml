@@ -67,7 +67,7 @@ jobs:
       - name: Upload coverage
         uses: codecov/codecov-action@v4
 
-  build-and-push-docker:
+  build-scan-push:
     needs: test
     runs-on: ubuntu-latest
     environment: production
@@ -85,33 +85,23 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.DOCKER_IMAGE }}
-          tags: |
-            type=sha
-            type=semver,pattern={{version}}
-            type=ref,event=branch
-          
-      - name: Build Docker image (local scan)
-        id: build
+      - name: Build for scanning
+        id: build-scan
         uses: docker/build-push-action@v5
         with:
           context: .
           push: false
-          tags: ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+          tags: ${{ env.DOCKER_IMAGE }}:scan-temp-${{ github.sha }}
           platforms: linux/amd64
           cache-from: type=registry,ref=${{ env.DOCKER_IMAGE }}:cache
           cache-to: type=inline,mode=max
           build-args: |
             PYTHON_VERSION=3.10.12
           
-      - name: Scan the Docker image with Trivy
+      - name: Scan with Trivy
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ steps.build.outputs.tags }}
+          image-ref: ${{ env.DOCKER_IMAGE }}:scan-temp-${{ github.sha }}
           format: sarif
           output: trivy-results.sarif
           exit-code: '1'
@@ -119,12 +109,12 @@ jobs:
           severity: CRITICAL,HIGH
           vuln-type: os,library
           
-      - name: Upload SARIF results
+      - name: Upload scan results
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
           
-      - name: Push to Docker Hub
+      - name: Build and push final image
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v5
         with:
@@ -134,5 +124,7 @@ jobs:
             ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
             ${{ env.DOCKER_IMAGE }}:latest
           platforms: linux/amd64,linux/arm64
-          cache-from: type=registry,ref=${{ env.DOCKER_IMAGE }}:cache
+          cache-from: |
+            type=registry,ref=${{ env.DOCKER_IMAGE }}:cache
+            type=registry,ref=${{ env.DOCKER_IMAGE }}:scan-temp-${{ github.sha }}
           cache-to: type=inline,mode=max
