@@ -95,14 +95,14 @@ jobs:
             type=semver,pattern={{version}}
             type=ref,event=branch
           
-      - name: Build and push Docker image
+      - name: Build Docker image (local scan)
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
+          push: false
+          tags: ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+          platforms: linux/amd64
           cache-from: type=registry,ref=${{ env.DOCKER_IMAGE }}:cache
           cache-to: type=inline,mode=max
           build-args: |
@@ -111,7 +111,7 @@ jobs:
       - name: Scan the Docker image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+          image-ref: ${{ steps.build.outputs.tags }}
           format: sarif
           output: trivy-results.sarif
           exit-code: '1'
@@ -124,9 +124,15 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
           
-      - name: Update latest tag
+      - name: Push to Docker Hub
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          docker pull ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
-          docker tag ${{ env.DOCKER_IMAGE }}:${{ github.sha }} ${{ env.DOCKER_IMAGE }}:latest
-          docker push ${{ env.DOCKER_IMAGE }}:latest
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+            ${{ env.DOCKER_IMAGE }}:latest
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=registry,ref=${{ env.DOCKER_IMAGE }}:cache
+          cache-to: type=inline,mode=max
