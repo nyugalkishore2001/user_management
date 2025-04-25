@@ -26,7 +26,7 @@ Faker==24.4.0
 # Web framework
 fastapi==0.110.0
 gunicorn==23.0.0  # Updated for CVE-2024-6827
-h11==0.16.0       # Updated for CVE-2025-43859
+h11==0.15.0       # Updated for CVE-2025-43859
 httpcore==1.0.5
 httpx==0.27.0
 
