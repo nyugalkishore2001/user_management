@@ -129,3 +129,4 @@ jobs:
           fi
           if grep -q '"severity": "HIGH"' trivy-results.sarif; then
             echo "HIGH vulnerabilities found - please review in GitHub Security tab." >&2
+          fi
