@@ -1,5 +1,5 @@
 # Base stage for building dependencies
-FROM python:3.12-bookworm as base
+FROM python:3.12-bookworm AS base
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -28,7 +28,7 @@ RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
 # Final lightweight stage
-FROM python:3.12-slim-bookworm as final
+FROM python:3.12-slim-bookworm AS final
 
 # Install runtime dependencies
 RUN apt-get update && \

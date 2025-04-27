@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     smtp_username: str = Field(default='your-mailtrap-username', description="Username for SMTP server")
     smtp_password: str = Field(default='your-mailtrap-password', description="Password for SMTP server")
 
+    kafka_server: str = "kafka:9092"
+    kafka_bootstrap_servers: str = Field(default='kafka:9092', description="Kafka bootstrap servers")
+    kafka_topic_email_notifications: str = Field(default='email_notifications', description="Kafka topic for email notifications")
+
 
     class Config:
         # If your .env file is not in the root directory, adjust the path accordingly.
