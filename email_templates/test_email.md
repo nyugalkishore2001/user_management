@@ -1,9 +1,5 @@
-# Hello, Email
+![Your Company Logo](http://example.com/path/to/your/logo.png)
 
-This is a *simple* test email sent from a Markdown file.
+# Welcome to [Your Company Name]
 
-- Point 1
-- Point 2
-- Point 3
-
-**Thank you!**
+---
