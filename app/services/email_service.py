@@ -46,3 +46,7 @@ class EmailService:
             "name": user_data.get("name", "")
         }
         publish_event(self.topic, key="professional_status_upgrade", value=json.dumps(event_data))
+
+    async def send_user_email(self, user_data: dict, template_name: str):
+        # Just a simple dummy implementation for now
+        return

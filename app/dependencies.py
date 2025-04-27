@@ -14,8 +14,7 @@ def get_settings() -> Settings:
     return Settings()
 
 def get_email_service() -> EmailService:
-    template_manager = TemplateManager()
-    return EmailService(template_manager=template_manager)
+    return EmailService()  # ✅ No parameters needed now
 
 async def get_db() -> AsyncSession:
     """Dependency that provides a database session for each request."""

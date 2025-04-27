@@ -26,6 +26,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, scoped_session
 from faker import Faker
+from unittest.mock import patch
 
 # Application-specific imports
 from app.main import app
@@ -227,14 +228,25 @@ def user_token(user):
     token_data = {"sub": str(user.id), "role": user.role.name}
     return create_access_token(data=token_data, expires_delta=timedelta(minutes=30))
 
+from app.services.email_service import EmailService
+
 @pytest.fixture
 def email_service():
     if settings.send_real_mail == 'true':
-        # Return the real email service when specifically testing email functionality
         return EmailService()
     else:
-        # Otherwise, use a mock to prevent actual email sending
         mock_service = AsyncMock(spec=EmailService)
         mock_service.send_verification_email.return_value = None
-        mock_service.send_user_email.return_value = None
+        mock_service.send_user_locked_email.return_value = None
+        mock_service.send_user_unlocked_email.return_value = None
+        mock_service.send_role_upgraded_email.return_value = None
+        mock_service.send_professional_status_email.return_value = None
+        mock_service.send_user_email.return_value = None  # now this will succeed
         return mock_service
+    
+
+@pytest.fixture(autouse=True)
+def patch_kafka_publish():
+    with patch('app.utils.kafka_producer.publish_event') as mock_publish:
+        mock_publish.return_value = None  # Do nothing during tests
+        yield mock_publish
