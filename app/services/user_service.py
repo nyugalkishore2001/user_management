@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import secrets
 from typing import Optional, Dict, List
 from pydantic import ValidationError
-from sqlalchemy import func, null, update, select
+from sqlalchemy import func, update, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_email_service, get_settings
@@ -52,7 +52,7 @@ class UserService:
     @classmethod
     async def create(cls, session: AsyncSession, user_data: Dict[str, str], email_service: EmailService) -> Optional[User]:
         try:
-            validated_data = UserCreate(**user_data).model_dump()
+            validated_data = user_data
             existing_user = await cls.get_by_email(session, validated_data['email'])
             if existing_user:
                 logger.error("User with given email already exists.")
@@ -68,7 +68,6 @@ class UserService:
             new_user.role = UserRole.ADMIN if user_count == 0 else UserRole.ANONYMOUS            
             if new_user.role == UserRole.ADMIN:
                 new_user.email_verified = True
-
             else:
                 new_user.verification_token = generate_verification_token()
                 await email_service.send_verification_email(new_user)
@@ -83,22 +82,20 @@ class UserService:
     @classmethod
     async def update(cls, session: AsyncSession, user_id: UUID, update_data: Dict[str, str]) -> Optional[User]:
         try:
-            # validated_data = UserUpdate(**update_data).dict(exclude_unset=True)
             validated_data = UserUpdate(**update_data).model_dump(exclude_unset=True)
-
             if 'password' in validated_data:
                 validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
             query = update(User).where(User.id == user_id).values(**validated_data).execution_options(synchronize_session="fetch")
             await cls._execute_query(session, query)
             updated_user = await cls.get_by_id(session, user_id)
             if updated_user:
-                session.refresh(updated_user)  # Explicitly refresh the updated user object
+                session.refresh(updated_user)
                 logger.info(f"User {user_id} updated successfully.")
                 return updated_user
             else:
                 logger.error(f"User {user_id} not found after update attempt.")
             return None
-        except Exception as e:  # Broad exception handling for debugging
+        except Exception as e:
             logger.error(f"Error during user update: {e}")
             return None
 
@@ -119,9 +116,10 @@ class UserService:
         return result.scalars().all() if result else []
 
     @classmethod
-    async def register_user(cls, session: AsyncSession, user_data: Dict[str, str], get_email_service) -> Optional[User]:
-        return await cls.create(session, user_data, get_email_service)
-    
+    async def register_user(cls, session: AsyncSession, user_data: UserCreate, email_service: EmailService) -> Optional[User]:
+    # Convert the Pydantic model to a dict before accessing like a dictionary
+        user_dict = user_data.model_dump()
+        return await cls.create(session, user_dict, email_service)
 
     @classmethod
     async def login_user(cls, session: AsyncSession, email: str, password: str) -> Optional[User]:
@@ -150,15 +148,14 @@ class UserService:
         user = await cls.get_by_email(session, email)
         return user.is_locked if user else False
 
-
     @classmethod
     async def reset_password(cls, session: AsyncSession, user_id: UUID, new_password: str) -> bool:
         hashed_password = hash_password(new_password)
         user = await cls.get_by_id(session, user_id)
         if user:
             user.hashed_password = hashed_password
-            user.failed_login_attempts = 0  # Resetting failed login attempts
-            user.is_locked = False  # Unlocking the user account, if locked
+            user.failed_login_attempts = 0
+            user.is_locked = False
             session.add(user)
             await session.commit()
             return True
@@ -169,7 +166,7 @@ class UserService:
         user = await cls.get_by_id(session, user_id)
         if user and user.verification_token == token:
             user.email_verified = True
-            user.verification_token = None  # Clear the token once used
+            user.verification_token = None
             user.role = UserRole.AUTHENTICATED
             session.add(user)
             await session.commit()
@@ -178,23 +175,16 @@ class UserService:
 
     @classmethod
     async def count(cls, session: AsyncSession) -> int:
-        """
-        Count the number of users in the database.
-
-        :param session: The AsyncSession instance for database access.
-        :return: The count of users.
-        """
         query = select(func.count()).select_from(User)
         result = await session.execute(query)
-        count = result.scalar()
-        return count
-    
+        return result.scalar()
+
     @classmethod
     async def unlock_user_account(cls, session: AsyncSession, user_id: UUID) -> bool:
         user = await cls.get_by_id(session, user_id)
         if user and user.is_locked:
             user.is_locked = False
-            user.failed_login_attempts = 0  # Optionally reset failed login attempts
+            user.failed_login_attempts = 0
             session.add(user)
             await session.commit()
             return True
