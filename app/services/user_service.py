@@ -52,20 +52,28 @@ class UserService:
     @classmethod
     async def create(cls, session: AsyncSession, user_data: Dict[str, str], email_service: EmailService) -> Optional[User]:
         try:
-            validated_data = user_data
+        # Validate incoming data with Pydantic model
+            validated = UserCreate(**user_data)
+            validated_data = validated.model_dump()
+
             existing_user = await cls.get_by_email(session, validated_data['email'])
             if existing_user:
                 logger.error("User with given email already exists.")
                 return None
+
             validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
             new_user = User(**validated_data)
+
+            # Ensure unique nickname
             new_nickname = generate_nickname()
             while await cls.get_by_nickname(session, new_nickname):
                 new_nickname = generate_nickname()
             new_user.nickname = new_nickname
+
             logger.info(f"User Role: {new_user.role}")
             user_count = await cls.count(session)
-            new_user.role = UserRole.ADMIN if user_count == 0 else UserRole.ANONYMOUS            
+            new_user.role = UserRole.ADMIN if user_count == 0 else UserRole.ANONYMOUS
+
             if new_user.role == UserRole.ADMIN:
                 new_user.email_verified = True
             else:
@@ -75,6 +83,7 @@ class UserService:
             session.add(new_user)
             await session.commit()
             return new_user
+
         except ValidationError as e:
             logger.error(f"Validation error during user creation: {e}")
             return None
@@ -116,9 +125,16 @@ class UserService:
         return result.scalars().all() if result else []
 
     @classmethod
-    async def register_user(cls, session: AsyncSession, user_data: UserCreate, email_service: EmailService) -> Optional[User]:
-    # Convert the Pydantic model to a dict before accessing like a dictionary
-        user_dict = user_data.model_dump()
+    async def register_user(cls, session: AsyncSession, user_data, email_service: EmailService) -> Optional[User]:
+        try:
+            if isinstance(user_data, dict):
+                user_data = UserCreate(**user_data)  # Validate dict
+            # At this point, user_data is a UserCreate instance
+            user_dict = user_data.model_dump()
+        except ValidationError as e:
+            logger.error(f"Validation error while registering user: {e}")
+            return None
+
         return await cls.create(session, user_dict, email_service)
 
     @classmethod
