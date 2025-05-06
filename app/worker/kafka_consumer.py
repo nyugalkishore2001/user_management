@@ -16,6 +16,7 @@ consumer = Consumer({
 })
 
 consumer.subscribe([settings.kafka_topic_email_notifications])
+consumer.subscribe(['user_unlocked'])
 
 def consume_events():
     print("Starting Kafka consumer...")
