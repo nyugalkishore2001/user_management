@@ -8,7 +8,8 @@ def user_data():
         "email": "test@example.com",
         "name": "Test User",
         "verification_url": "http://example.com/verify?token=abc123",
-        "new_role": "PROFESSIONAL"
+        "new_role": "PROFESSIONAL",
+        "user_id": "11111111-1111-1111-1111-111111111111"
     }
 
 @patch('app.worker.tasks.email_sender.send_verification_email')
@@ -32,6 +33,21 @@ def test_send_role_upgraded_email_task(mock_send_email, user_data):
     mock_send_email.assert_called_once_with(user_data)
 
 @patch('app.worker.tasks.email_sender.send_professional_status_email')
-def test_send_professional_status_email_task(mock_send_email, user_data):
+@patch('app.worker.tasks.Database.get_session_factory')
+def test_send_professional_status_email_task(mock_get_factory, mock_send_email, user_data):
+    """
+    Mocks async session handling and email sending for professional status task.
+    """
+    # Mock session and user object
+    mock_session = patch("sqlalchemy.ext.asyncio.AsyncSession", autospec=True).start()
+    mock_user = patch("app.models.user_model.User", autospec=True).start()
+    mock_user.professional_status_updated_at = "2025-05-05T17:00:00Z"
+    mock_user.id = user_data["user_id"]
+
+    # Set up async session context manager
+    session_instance = mock_session.return_value.__aenter__.return_value
+    session_instance.get.return_value = mock_user
+    mock_get_factory.return_value = mock_session
+
     tasks.send_professional_status_email_task(user_data)
     mock_send_email.assert_called_once_with(user_data)

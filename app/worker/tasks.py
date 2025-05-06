@@ -99,3 +99,5 @@ def send_professional_status_email_task(self, user_data: dict):
                 raise
 
     asyncio.run(_handle_email())
+
+__all__ = ["email_sender"]
