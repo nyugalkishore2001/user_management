@@ -1,7 +1,10 @@
 import smtplib
+import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from settings.config import settings
+
+logger = logging.getLogger(__name__)
 
 class RealEmailSenderService:
     def __init__(self):
@@ -18,14 +21,19 @@ class RealEmailSenderService:
 
         message.attach(MIMEText(body, "plain"))
 
-        with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-            server.starttls()
-            server.login(self.smtp_username, self.smtp_password)
-            server.sendmail(
-                self.smtp_username,
-                recipient_email,
-                message.as_string()
-            )
+        try:
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.smtp_username, self.smtp_password)
+                server.sendmail(
+                    self.smtp_username,
+                    recipient_email,
+                    message.as_string()
+                )
+            logger.info(f"✅ Email sent successfully to {recipient_email} with subject '{subject}'")
+        except Exception as e:
+            logger.error(f"❌ Failed to send email to {recipient_email} with subject '{subject}': {e}")
+            raise
 
     def send_verification_email(self, user_data):
         subject = "Verify Your Account"
